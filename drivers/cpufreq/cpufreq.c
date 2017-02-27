@@ -475,23 +475,30 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 static ssize_t store_##file_name					\
 (struct cpufreq_policy *policy, const char *buf, size_t count)		\
 {									\
-	int ret = -EINVAL;					\
+	unsigned int ret = -EINVAL;					\
 	struct cpufreq_policy new_policy;				\
+	int mpd = strcmp(current->comm, "mpdecision");			\
 									\
+	if (mpd == 0)							\
+			return ret; 								\
+														\
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);		\
 	if (ret)							\
 		return -EINVAL;						\
+									\
+	new_policy.min = new_policy.user_policy.min;			\
+	new_policy.max = new_policy.user_policy.max;			\
 									\
 	ret = sscanf(buf, "%u", &new_policy.object);			\
 	if (ret != 1)							\
 		return -EINVAL;						\
 									\
-	policy->user_policy.object = new_policy.object;			\
-	new_policy.user_policy.object = new_policy.object;		\
-									\
 	ret = cpufreq_driver->verify(&new_policy);			\
 	if (ret)							\
 		pr_err("cpufreq: Frequency verification failed\n");	\
+									\
+	policy->user_policy.min = new_policy.min;			\
+	policy->user_policy.min = new_policy.min;			\
 									\
 	ret = __cpufreq_set_policy(policy, &new_policy);		\
 	policy->user_policy.object = new_policy.object;			\
@@ -583,7 +590,9 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	int ret = -EINVAL;
 	char	str_governor[16];
 	struct cpufreq_policy new_policy;
-
+	char *envp[3];
+	char buf1[64];
+	char buf2[64];
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);
 	if (ret)
 		return ret;
@@ -607,7 +616,11 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	policy->user_policy.governor = policy->governor;
 
 	sysfs_notify(&policy->kobj, NULL, "scaling_governor");
-
+	snprintf(buf1, sizeof(buf1), "GOV=%s", policy->governor->name);
+	snprintf(buf2, sizeof(buf2), "CPU=%u", policy->cpu);
+	envp[0] = buf1;
+	envp[1] = buf2;
+	envp[2] = NULL;
 	kobject_uevent(cpufreq_global_kobject, KOBJ_ADD);
 
 	if (ret)
@@ -1910,6 +1923,10 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 #endif
 	}
 
+	//Added to ensure mpdecision can scale back the policy
+	if (policy->user_policy.min > policy->min)
+		policy->user_policy.min = policy->min;
+	
 	/* verify the cpu speed can be set within this limit */
 	ret = cpufreq_driver->verify(policy);
 	if (ret)
