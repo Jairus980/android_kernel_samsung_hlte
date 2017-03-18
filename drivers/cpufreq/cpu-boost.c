@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -34,6 +34,7 @@ struct cpu_sync {
 	int cpu;
 	spinlock_t lock;
 	bool pending;
+	atomic_t being_woken;
 	int src_cpu;
 	unsigned int boost_min;
 	unsigned int input_boost_min;
@@ -172,17 +173,55 @@ static int boost_mig_sync_thread(void *data)
 			continue;
 		}
 
+#ifdef CONFIG_CPUFREQ_HARDLIMIT
+		if (sync_threshold && (dest_policy.cur >= check_cpufreq_hardlimit(sync_threshold))) /* Yank555.lu - Enforce hardlimit */
+#else
 		if (sync_threshold && (dest_policy.cur >= sync_threshold))
+#endif
 			continue;
 
 		cancel_delayed_work_sync(&s->boost_rem);
 		if (sync_threshold) {
 			if (src_policy.cur >= sync_threshold)
+#ifdef CONFIG_CPUFREQ_HARDLIMIT
+				#ifdef CPUFREQ_HARDLIMIT_DEBUG
+				pr_info("[HARDLIMIT] cpu-boost.c run_boost_migration (A) : sync_threshold = %u / src_policy.cur = %u / old_boost_min = %u / new_boost_min = %u \n",
+						sync_threshold,
+						src_policy.cur,
+						s->boost_min,
+						check_cpufreq_hardlimit(sync_threshold)
+					);
+				#endif
+				s->boost_min = check_cpufreq_hardlimit(sync_threshold); /* Yank555.lu - Enforce hardlimit */
+#else
 				s->boost_min = sync_threshold;
+#endif
 			else
+#ifdef CONFIG_CPUFREQ_HARDLIMIT
+				#ifdef CPUFREQ_HARDLIMIT_DEBUG
+				pr_info("[HARDLIMIT] cpu-boost.c run_boost_migration (B) : src_policy.cur = %u / old_boost_min = %u / new_boost_min = %u \n",
+						src_policy.cur,
+						s->boost_min,
+						check_cpufreq_hardlimit(src_policy.cur)
+					);
+				#endif
+				s->boost_min = check_cpufreq_hardlimit(src_policy.cur); /* Yank555.lu - Enforce hardlimit */
+#else
 				s->boost_min = src_policy.cur;
+#endif
 		} else {
+#ifdef CONFIG_CPUFREQ_HARDLIMIT
+			#ifdef CPUFREQ_HARDLIMIT_DEBUG
+			pr_info("[HARDLIMIT] cpu-boost.c run_boost_migration (B) : src_policy.cur = %u / old_boost_min = %u / new_boost_min = %u \n",
+					src_policy.cur,
+					s->boost_min,
+					check_cpufreq_hardlimit(src_policy.cur)
+				);
+			#endif
+			s->boost_min = check_cpufreq_hardlimit(src_policy.cur); /* Yank555.lu - Enforce hardlimit */
+#else
 			s->boost_min = src_policy.cur;
+#endif
 		}
 		/* Force policy re-evaluation to trigger adjust notifier. */
 		get_online_cpus();
@@ -216,7 +255,16 @@ static int boost_migration_notify(struct notifier_block *nb,
 	s->pending = true;
 	s->src_cpu = (int) arg;
 	spin_unlock_irqrestore(&s->lock, flags);
-	wake_up(&s->sync_wq);
+	/*
+	* Avoid issuing recursive wakeup call, as sync thread itself could be
+	* seen as migrating triggering this notification. Note that sync thread
+	* of a cpu could be running for a short while with its affinity broken
+	* because of CPU hotplug.
+	*/
+	if (!atomic_cmpxchg(&s->being_woken, 0, 1)) {
+		wake_up(&s->sync_wq);
+		atomic_set(&s->being_woken, 0);
+	}
 
 	return NOTIFY_OK;
 }
@@ -233,7 +281,6 @@ static void do_input_boost(struct work_struct *work)
 
 	if (!cpuboost_enable) return;
 
-	get_online_cpus();
 	for_each_online_cpu(i) {
 
 		i_sync_info = &per_cpu(sync_info, i);
@@ -360,6 +407,7 @@ static int cpu_boost_init(void)
 		s = &per_cpu(sync_info, cpu);
 		s->cpu = cpu;
 		init_waitqueue_head(&s->sync_wq);
+		atomic_set(&s->being_woken, 0);
 		spin_lock_init(&s->lock);
 		INIT_DELAYED_WORK(&s->boost_rem, do_boost_rem);
 		INIT_DELAYED_WORK(&s->input_boost_rem, do_input_boost_rem);
