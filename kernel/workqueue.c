@@ -1111,7 +1111,7 @@ static void delayed_work_timer_fn(unsigned long __data)
 	struct delayed_work *dwork = (struct delayed_work *)__data;
 	struct cpu_workqueue_struct *cwq = get_work_cwq(&dwork->work);
 
-	__queue_work(WORK_CPU_UNBOUND, cwq->wq, &dwork->work);
+	__queue_work(dwork->cpu, cwq->wq, &dwork->work);
 }
 
 /**
@@ -2746,7 +2746,7 @@ EXPORT_SYMBOL_GPL(cancel_work_sync);
 bool flush_delayed_work(struct delayed_work *dwork)
 {
 	if (del_timer_sync(&dwork->timer))
-		__queue_work(WORK_CPU_UNBOUND,
+		__queue_work(dwork->cpu,
 			     get_work_cwq(&dwork->work)->wq, &dwork->work);
 	return flush_work(&dwork->work);
 }
@@ -2767,7 +2767,7 @@ EXPORT_SYMBOL(flush_delayed_work);
 bool flush_delayed_work_sync(struct delayed_work *dwork)
 {
 	if (del_timer_sync(&dwork->timer))
-		__queue_work(WORK_CPU_UNBOUND,
+		__queue_work(dwork->cpu,
 			     get_work_cwq(&dwork->work)->wq, &dwork->work);
 	return flush_work_sync(&dwork->work);
 }
