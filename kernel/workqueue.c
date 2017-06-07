@@ -1011,7 +1011,7 @@ static void __queue_work(unsigned int cpu, struct workqueue_struct *wq,
 	if (!(wq->flags & WQ_UNBOUND)) {
 		struct global_cwq *last_gcwq;
 
-		if (unlikely(cpu == WORK_CPU_UNBOUND))
+		if (cpu == WORK_CPU_UNBOUND)
 			cpu = raw_smp_processor_id();
 
 		/*
@@ -1078,12 +1078,7 @@ static void __queue_work(unsigned int cpu, struct workqueue_struct *wq,
  */
 int queue_work(struct workqueue_struct *wq, struct work_struct *work)
 {
-	int ret;
-
-	ret = queue_work_on(get_cpu(), wq, work);
-	put_cpu();
-
-	return ret;
+	return queue_work_on(WORK_CPU_UNBOUND, wq, work);
 }
 EXPORT_SYMBOL_GPL(queue_work);
 
@@ -1116,7 +1111,7 @@ static void delayed_work_timer_fn(unsigned long __data)
 	struct delayed_work *dwork = (struct delayed_work *)__data;
 	struct cpu_workqueue_struct *cwq = get_work_cwq(&dwork->work);
 
-	__queue_work(smp_processor_id(), cwq->wq, &dwork->work);
+	__queue_work(WORK_CPU_UNBOUND, cwq->wq, &dwork->work);
 }
 
 /**
@@ -1133,7 +1128,7 @@ int queue_delayed_work(struct workqueue_struct *wq,
 	if (delay == 0)
 		return queue_work(wq, &dwork->work);
 
-	return queue_delayed_work_on(-1, wq, dwork, delay);
+	return queue_delayed_work_on(WORK_CPU_UNBOUND, wq, dwork, delay);
 }
 EXPORT_SYMBOL_GPL(queue_delayed_work);
 
@@ -1182,7 +1177,7 @@ int queue_delayed_work_on(int cpu, struct workqueue_struct *wq,
 		timer->data = (unsigned long)dwork;
 		timer->function = delayed_work_timer_fn;
 
-		if (unlikely(cpu >= 0))
+		if (unlikely(cpu != WORK_CPU_UNBOUND))
 			add_timer_on(timer, cpu);
 		else
 			add_timer(timer);
@@ -2751,7 +2746,7 @@ EXPORT_SYMBOL_GPL(cancel_work_sync);
 bool flush_delayed_work(struct delayed_work *dwork)
 {
 	if (del_timer_sync(&dwork->timer))
-		__queue_work(raw_smp_processor_id(),
+		__queue_work(WORK_CPU_UNBOUND,
 			     get_work_cwq(&dwork->work)->wq, &dwork->work);
 	return flush_work(&dwork->work);
 }
@@ -2772,7 +2767,7 @@ EXPORT_SYMBOL(flush_delayed_work);
 bool flush_delayed_work_sync(struct delayed_work *dwork)
 {
 	if (del_timer_sync(&dwork->timer))
-		__queue_work(raw_smp_processor_id(),
+		__queue_work(WORK_CPU_UNBOUND,
 			     get_work_cwq(&dwork->work)->wq, &dwork->work);
 	return flush_work_sync(&dwork->work);
 }
