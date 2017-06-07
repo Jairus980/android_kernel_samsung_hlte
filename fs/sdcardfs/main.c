@@ -26,6 +26,8 @@
 #include "../internal.h"
 
 enum {
+	Opt_fsuid,
+	Opt_fsgid,
 	Opt_low_uid,
 	Opt_low_gid,
 	Opt_gid,
@@ -35,21 +37,25 @@ enum {
 	Opt_reserved_mb,
 	Opt_mask,
 	Opt_multi_user,
+	Opt_multiuser, // May need?
 	Opt_label,
 	Opt_type,
 	Opt_err,
 };
 
 static const match_table_t sdcardfs_tokens = {
+	{Opt_fsuid, "fsuid=%u"},
+	{Opt_fsgid, "fsgid=%u"},
 	{Opt_low_uid, "low_uid=%u"},
 	{Opt_low_gid, "low_gid=%u"},
 	{Opt_gid, "gid=%u"},
-	{Opt_userid, "userid=%u"},
+	{Opt_userid, "userid=%d"},
 	{Opt_debug, "debug"},
 	{Opt_lower_fs, "lower_fs=%s"},
 	{Opt_reserved_mb, "reserved_mb=%u"},
-	{Opt_mask, "mask=%o"},
+	{Opt_mask, "mask=%u"},
 	{Opt_multi_user, "multi_user"},
+	{Opt_multiuser, "multiuser"},
 	{Opt_label, "label=%s"},
 	{Opt_type, "type=%s"},
 	{Opt_err, NULL}
@@ -97,10 +103,20 @@ static int parse_options(struct super_block *sb, char *options, int silent,
 		case Opt_debug:
 			*debug = 1;
 			break;
+		case Opt_fsuid:
+			if (match_int(&args[0], &option))
+				return 0;
+			opts->fs_low_uid = option;
+			break;
 		case Opt_low_uid:
 			if (match_int(&args[0], &option))
 				return 0;
 			opts->fs_low_uid = option;
+			break;
+		case Opt_fsgid:
+			if (match_int(&args[0], &option))
+				return 0;
+			opts->fs_low_gid = option;
 			break;
 		case Opt_low_gid:
 			if (match_int(&args[0], &option))
@@ -143,6 +159,12 @@ static int parse_options(struct super_block *sb, char *options, int silent,
 			break;
 		case Opt_multi_user:
 			opts->multi_user = true;
+			break;
+		case Opt_multiuser:
+			/*
+			 "opts->multiuser = true" doesn't exist in sdcardfs_mount_options
+			 skipping this
+			 */
 			break;
 		case Opt_label:
 			label = match_strdup(&args[0]);
