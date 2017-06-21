@@ -383,6 +383,9 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -funswitch-loops -fpredictive-commoning -fgcse-after-reload \
 		   -Wno-sizeof-pointer-memaccess \
 		   -fno-delete-null-pointer-checks \
+		   -Wno-bool-compare -Wno-logical-not-parentheses -Wno-incompatible-pointer-types \
+		   -Wno-tautological-compare -Wno-unused-const-variable \
+		   -Wno-format-truncation -Wno-duplicate-decl-specifier -Wno-memset-elt-size -Wno-bool-operation -Wno-int-in-bool-context -Wno-parentheses -Wno-switch-unreachable -Wno-stringop-overflow -Wno-format-overflow \
 		   -std=gnu89
 
 # Optimizations
