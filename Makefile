@@ -357,7 +357,7 @@ CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
 CFLAGS_MODULE   = -marm
 AFLAGS_MODULE   = -marm
-LDFLAGS_MODULE  = -marm
+LDFLAGS_MODULE  = -marm --strip-debug
 CFLAGS_KERNEL	= -marm
 AFLAGS_KERNEL	= -marm
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
