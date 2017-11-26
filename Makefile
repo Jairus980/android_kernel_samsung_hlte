@@ -386,6 +386,7 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Wno-bool-compare -Wno-logical-not-parentheses -Wno-incompatible-pointer-types \
 		   -Wno-tautological-compare -Wno-unused-const-variable \
 		   -Wno-format-truncation -Wno-duplicate-decl-specifier -Wno-memset-elt-size -Wno-bool-operation -Wno-int-in-bool-context -Wno-parentheses -Wno-switch-unreachable -Wno-stringop-overflow -Wno-format-overflow \
+		   -Wno-misleading-indentation -Wno-format -fno-modulo-sched -Wno-multistatement-macros \
 		   -std=gnu89
 
 # Optimizations
@@ -396,6 +397,14 @@ KBUILD_AFLAGS   := -D__ASSEMBLY__
 KBUILD_AFLAGS_MODULE  := -DMODULE
 KBUILD_CFLAGS_MODULE  := -DMODULE -fno-pic
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
+
+# Some warning blocks
+KBUILD_CFLAGS   += $(call cc-disable-warning,maybe-uninitialized,)
+KBUILD_CFLAGS   += $(call cc-disable-warning,misleading-indentation,)
+KBUILD_CFLAGS   += $(call cc-disable-warning,format-truncation,)
+KBUILD_CFLAGS   += $(call cc-disable-warning,array-bounds,)
+KBUILD_CFLAGS   += $(call cc-disable-warning,incompatible-pointer-types,)
+KBUILD_CFLAGS   += $(call cc-disable-warning,unused-const-variable,)
 
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
 KERNELRELEASE = $(shell cat include/config/kernel.release 2> /dev/null)
@@ -578,12 +587,6 @@ endif # $(dot-config)
 # This allow a user to issue only 'make' to build a kernel including modules
 # Defaults to vmlinux, but the arch makefile usually adds further targets
 all: vmlinux
-
-ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
-KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
-else
-KBUILD_CFLAGS	+= -O2 $(call cc-disable-warning,maybe-uninitialized,)
-endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
 
